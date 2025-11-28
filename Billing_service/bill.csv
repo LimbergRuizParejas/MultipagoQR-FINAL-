@@ -1,0 +1,4 @@
+﻿service_id,customer_ref,period,amount,due_date
+srv_luz,1234567,Octubre 2025,150.50,2025-10-31
+srv_agua,987654,Octubre 2025,80.00,2025-10-25
+srv_luz,555444,Octubre 2025,120.10,2025-10-30
