@@ -1,0 +1,130 @@
+/* ==================================================
+   1) TAILWIND CSS (v4 / @tailwindcss/postcss)
+   ================================================== */
+/* 👇 Esta línea es la que hace que existan clases como bg-red-600, grid, etc. */
+@import "tailwindcss";
+
+/* ==================================================
+   2) VARIABLES Y TIPOGRAFÍA GLOBAL
+   ================================================== */
+
+:root {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  /* Solo modo claro */
+  color-scheme: light;
+  color: #111827;
+  background-color: #f3f4f6;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Enlaces genéricos (además de lo que da Tailwind) */
+a {
+  font-weight: 500;
+  color: #b91c1c;            /* rojo corporativo */
+  text-decoration: none;
+}
+
+a:hover {
+  color: #7f1d1d;            /* rojo más oscuro */
+  text-decoration: underline;
+}
+
+/* ==================================================
+   3) BODY / ROOT
+   ================================================== */
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background-color: #f3f4f6;  /* gris claro */
+  color: #111827;
+}
+
+/* Deja que el layout lo maneje tu PublicLayout / Tailwind */
+#root {
+  width: 100%;
+}
+
+/* ==================================================
+   4) TITULOS
+   ================================================== */
+
+h1 {
+  font-size: 2.25rem; /* 36px aprox – Tailwind: text-3xl */
+  line-height: 1.2;
+  margin: 0;
+}
+
+h2,
+h3,
+h4 {
+  margin: 0;
+}
+
+/* ==================================================
+   5) BOTÓN BASE (fallback, encima va Tailwind)
+   ================================================== */
+
+button {
+  border-radius: 0.5rem;
+  border: 1px solid transparent;
+  padding: 0.6em 1.2em;
+  font-size: 1rem;
+  font-weight: 500;
+  font-family: inherit;
+  background-color: #b91c1c;   /* rojo */
+  color: #ffffff;
+  cursor: pointer;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+button:hover {
+  background-color: #7f1d1d;
+  border-color: #7f1d1d;
+  box-shadow: 0 4px 10px rgba(185, 28, 28, 0.35);
+}
+
+button:focus,
+button:focus-visible {
+  outline: 3px solid rgba(185, 28, 28, 0.7);
+  outline-offset: 2px;
+}
+
+button:disabled {
+  background-color: #9ca3af;
+  border-color: transparent;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* ==================================================
+   6) TEXTO DE ESTADO GENÉRICO
+   ================================================== */
+
+.loading {
+  color: #4b5563;
+  font-size: 0.95rem;
+}
+
+.error {
+  color: #dc2626;
+  font-weight: 600;
+}
+
+.success {
+  color: #15803d;
+  font-size: 1.05rem;
+  margin-top: 0.5rem;
+}
