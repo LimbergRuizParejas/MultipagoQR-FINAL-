@@ -1,23 +1,32 @@
-"""
-URL configuration for Billing_service project.
-
-The `urlpatterns` list routes URLs to views. For more information please see:
-    https://docs.djangoproject.com/en/5.2/topics/http/urls/
-Examples:
-Function views
-    1. Add an import:  from my_app import views
-    2. Add a URL to urlpatterns:  path('', views.home, name='home')
-Class-based views
-    1. Add an import:  from other_app.views import Home
-    2. Add a URL to urlpatterns:  path('', Home.as_view(), name='home')
-Including another URLconf
-    1. Import the include() function: from django.urls import include, path
-    2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
-"""
 from django.contrib import admin
 from django.urls import path, include
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
-    path('api/', include('debts.urls')),
+    # =======================================================
+    # 🌐 Panel de administración Django
+    # =======================================================
+    path("admin/", admin.site.urls),
+
+    # =======================================================
+    # 📡 API PÚBLICA (usada por el API Gateway)
+    #
+    # El Gateway invoca:
+    #   /api/public/debts/lookup/
+    #   /api/public/debts/stats/
+    #   /api/public/debts/import/
+    #
+    # Por eso DEBE existir la ruta:
+    #   path("api/public/", include(...))
+    # =======================================================
+    path("api/public/", include("debts.urls")),
+
+    # =======================================================
+    # 🔎 (Opcional) API interna sin "public/"
+    # Útil para pruebas locales:
+    #
+    #   /api/debts/lookup/
+    #
+    # NO interfere con la API pública.
+    # =======================================================
+    path("api/", include("debts.urls")),
 ]

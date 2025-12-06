@@ -4,12 +4,13 @@ import com.multipagos.pagos.model.Transaccion;
 import com.multipagos.pagos.client.IDeudasClient;
 import com.multipagos.pagos.repository.TransaccionRepository;
 import com.multipagos.pagos.utils.GenerarPDF;
+
+import com.multipagos.pagos.client.DebtDTO;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-
-import com.multipagos.pagos.client.DebtDTO;
 
 @Service
 public class PagosService {
@@ -23,40 +24,44 @@ public class PagosService {
     @Autowired
     private GenerarPDF generarPDF;
 
-
-    /* ============================================================================
-       1) PROCESAR PAGO REAL O SIMULADO
-    ============================================================================ */
+    // ============================================================
+    // 🔥 1) PROCESAR PAGO
+    // ============================================================
     public Transaccion processPayment(Long debtId, Double amount) {
 
         String status = "APROBADO";
         Transaccion tx;
 
         try {
-            /* Intentamos obtener la deuda del microservicio */
+            // Buscar deuda real en Billing_service
             DebtDTO debt = deudasClient.lookupDebtById(String.valueOf(debtId));
 
             if (debt != null) {
+
+                Double montoFinal = (amount != null)
+                        ? amount
+                        : (debt.getAmount() != null ? debt.getAmount() : 0.0);
 
                 tx = Transaccion.builder()
                         .tenantId(debt.getTenantId())
                         .serviceId(debt.getServiceId())
                         .customerRef(debt.getCustomerRef())
-                        .monto(amount != null ? amount : debt.getAmount())
+                        .monto(montoFinal)
                         .debtId(String.valueOf(debt.getId()))
                         .estado(status)
                         .build();
 
-                // Marcar deuda como pagada (lo que espera el sistema de Gorena)
+                // Marcar deuda como pagada en billing
                 deudasClient.updateDebtStatus(String.valueOf(debt.getId()), "PAID");
 
             } else {
-                /* Si no pudo encontrar deuda, igual generamos la transacción */
+
+                // Si no existe, aun así registramos el pago
                 deudasClient.updateDebtStatus(String.valueOf(debtId), "PAID");
 
                 tx = Transaccion.builder()
-                        .tenantId(null)
-                        .serviceId(null)
+                        .tenantId("0")
+                        .serviceId("0")
                         .customerRef("SIN_LOOKUP")
                         .monto(amount != null ? amount : 0.0)
                         .debtId(String.valueOf(debtId))
@@ -65,10 +70,11 @@ public class PagosService {
             }
 
         } catch (Exception e) {
-            /* Si explota el lookup, igual generamos la transacción */
+
+            // Si Billing falla, igual registramos el pago
             tx = Transaccion.builder()
-                    .tenantId(null)
-                    .serviceId(null)
+                    .tenantId("0")
+                    .serviceId("0")
                     .customerRef("ERROR_LOOKUP")
                     .monto(amount != null ? amount : 0.0)
                     .debtId(String.valueOf(debtId))
@@ -76,31 +82,46 @@ public class PagosService {
                     .build();
         }
 
-        /* Guardar transacción */
-        Transaccion savedTx = transaccionRepository.save(tx);
+        // Guardar transacción en BD
+        Transaccion saved = transaccionRepository.save(tx);
 
-        /* Generar comprobante PDF */
-        String receiptUrl = generarPDF.generarComprobante(savedTx);
+        // Generar PDF
+        String receiptName = generarPDF.generarComprobante(saved);
+        saved.setHashRecibo(receiptName);
 
-        savedTx.setHashRecibo(receiptUrl);
-
-        /* Guardar nuevamente con el hash de recibo */
-        return transaccionRepository.save(savedTx);
+        // Volver a guardar la transacción con el PDF
+        return transaccionRepository.save(saved);
     }
 
-
-    /* ============================================================================
-       2) LISTAR TODAS LAS TRANSACCIONES (HISTORIAL)
-    ============================================================================ */
+    // ============================================================
+    // 🔥 2) LISTAR TODAS LAS TRANSACCIONES
+    // ============================================================
     public List<Transaccion> findAllTransacciones() {
         return transaccionRepository.findAll();
     }
 
-
-    /* ============================================================================
-       3) LOOKUP MANUAL (OPCIONAL PARA OTRAS FUNCIONES)
-    ============================================================================ */
+    // ============================================================
+    // 🔥 3) LOOKUP CENTRALIZADO
+    // ============================================================
     public DebtDTO lookupDebtByService(String customerRef, String serviceId, String tenantId) {
         return deudasClient.lookupDebtByService(customerRef, serviceId, tenantId);
+    }
+
+    // ============================================================
+    // 🔥 4) **NUEVO** – LISTAR PAGOS POR EMPRESA (tenant_id)
+    //
+    // Endpoint usado por:
+    //     GET /pagos/listar?company_id=1
+    //
+    // Este método ES OBLIGATORIO porque:
+    //     → Django llama /pagos/listar
+    //     → Tu frontend proveedor (Pagos Recibidos) también
+    // ============================================================
+    public List<Transaccion> findPagosByCompanyId(String companyId) {
+        try {
+            return transaccionRepository.findByTenantId(companyId);
+        } catch (Exception e) {
+            throw new RuntimeException("Error listado pagos: " + e.getMessage());
+        }
     }
 }

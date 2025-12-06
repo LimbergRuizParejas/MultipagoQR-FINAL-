@@ -10,26 +10,27 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
+import os
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Cargar las variables de entorno desde un archivo .env (para mantener las credenciales seguras)
+load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Cargar la clave secreta desde las variables de entorno
+SECRET_KEY = os.getenv('SECRET_KEY', 'default-secret-key')
 
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
+# Seguridad: no usar DEBUG en producción
+DEBUG = os.getenv('DEBUG', 'True') == 'True'
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-p3j9hmwvpl!tap03$)(k(p2n^rasrgwmmz-k5w$!twgx%@3x&q'
-
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
-
-ALLOWED_HOSTS = []
-
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '').split(',')
+ALLOWED_HOSTS = ['127.0.0.1', 'localhost', '127.0.0.1:8001']
+ALLOWED_HOSTS = ['*']
 
 # Application definition
-
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -37,8 +38,8 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'rest_framework', # <-- Añadir DRF
-    'debts.apps.DebtsConfig', # <-- Añadir tu nueva app
+    'rest_framework',  # Agregado DRF (Django Rest Framework)
+    'debts.apps.DebtsConfig',  # Agregar tu nueva app de deudas
 ]
 
 MIDDLEWARE = [
@@ -56,8 +57,7 @@ ROOT_URLCONF = 'Billing_service.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [BASE_DIR / 'templates']
-        ,
+        'DIRS': [BASE_DIR / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -71,21 +71,21 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'Billing_service.wsgi.application'
 
-
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
-
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql',  # Usar PostgreSQL
+        'NAME': os.getenv('DB_NAME', 'Billing_service'),  # Nombre de la base de datos
+        'USER': os.getenv('DB_USER', 'postgres'),  # Usuario de PostgreSQL
+        'PASSWORD': os.getenv('DB_PASSWORD', 'root'),  # Contraseña de la base de datos
+        'HOST': os.getenv('DB_HOST', 'localhost'),  # Puede ser localhost o la IP del servidor
+        'PORT': os.getenv('DB_PORT', '5432'),  # Puerto de PostgreSQL
     }
 }
 
-
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
-
 AUTH_PASSWORD_VALIDATORS = [
     {
         'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
@@ -101,25 +101,26 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
-
 LANGUAGE_CODE = 'en-us'
-
 TIME_ZONE = 'UTC'
 
 USE_I18N = True
-
 USE_TZ = True
-
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
-
 STATIC_URL = 'static/'
 
-# Default primary key field type
-# https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
+# Custom static file directories (opcional)
+STATICFILES_DIRS = [
+    BASE_DIR / "static"
+]
 
+# Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Seguridad en producción
+
+# .env settings for SECRET_KEY, DB, and other secure values (use a .env file to store these sensitive details)

@@ -4,10 +4,15 @@ import com.multipagos.pagos.model.Transaccion;
 import com.multipagos.pagos.service.PagosService;
 import com.multipagos.pagos.client.LookupRequestDTO;
 import com.multipagos.pagos.client.DebtDTO;
+
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
 
@@ -22,69 +27,133 @@ public class PagosController {
         this.pagosService = pagosService;
     }
 
-    // Endpoint para verificar si el servicio está activo
+    // =========================================================================
+    // ❤️ HEALTHCHECK
+    // =========================================================================
     @GetMapping
-    public String indexPagos() {
-        return "¡Servicio de Pagos Activo! Accede a /pagos/transacciones para ver las transacciones.";
+    public ResponseEntity<Map<String, String>> health() {
+        return ResponseEntity.ok(Map.of(
+                "status", "OK",
+                "message", "Servicio de Pagos Activo",
+                "transacciones_url", "/pagos/transacciones",
+                "listar_pagos_url", "/pagos/listar?company_id=1"
+        ));
     }
 
-    // Obtener todas las transacciones
+    // =========================================================================
+    // 🔥 LISTAR TODAS LAS TRANSACCIONES
+    // =========================================================================
     @GetMapping("/transacciones")
     public ResponseEntity<List<Transaccion>> getAllTransacciones() {
-        List<Transaccion> transacciones = pagosService.findAllTransacciones();
-        return ResponseEntity.ok(transacciones);
+        return ResponseEntity.ok(pagosService.findAllTransacciones());
     }
 
-    // Confirmar un pago mediante su deuda y monto
+    // =========================================================================
+    // 🔥 NUEVO — LISTAR PAGOS POR EMPRESA
+    // GET /pagos/listar?company_id=1
+    // =========================================================================
+    @GetMapping("/listar")
+    public ResponseEntity<?> listarPagos(@RequestParam(name = "company_id", required = false) String companyId) {
+        try {
+            if (companyId == null || companyId.isBlank()) {
+                return ResponseEntity.badRequest().body(
+                        Map.of("error", "company_id es obligatorio")
+                );
+            }
+
+            List<Transaccion> pagos = pagosService.findPagosByCompanyId(companyId);
+            return ResponseEntity.ok(pagos);
+
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(
+                    Map.of("error", "Error al obtener pagos: " + e.getMessage())
+            );
+        }
+    }
+
+    // =========================================================================
+    // 🔥 CONFIRMAR PAGO
+    // POST /pagos/confirm
+    // =========================================================================
     @PostMapping("/confirm")
-    public ResponseEntity<Map<String, String>> confirmPayment(@RequestBody Map<String, Object> request) {
-        // Convertimos el debtId a Long, ya que processPayment espera un Long
-        String debtIdString = (String) request.get("debt_id");
-        Long debtId = Long.valueOf(debtIdString);  // Conversión de String a Long
-        Double amount = Double.parseDouble(request.get("amount").toString());
+    public ResponseEntity<?> confirmPayment(@RequestBody Map<String, Object> req) {
 
-        // Pasamos debtId como Long al método processPayment
-        Transaccion tx = pagosService.processPayment(debtId, amount);
-
-        return ResponseEntity.ok(Map.of(
-                "message", "Pago Aprobado",
-                "transaction_id", tx.getId().toString(),
-                "receipt_url", tx.getHashRecibo()));
-    }
-
-    // Realizar la búsqueda de deuda de un cliente por servicio
-    @PostMapping("/lookup")
-    public ResponseEntity<DebtDTO> lookupDebt(@RequestBody LookupRequestDTO request) {
-        String serviceId = request.getService_id();
-        String customerRef = request.getCustomer_ref();
-        String tenantId = request.getTenant_id();
-
-        if (customerRef == null || customerRef.isEmpty()) {
-            return ResponseEntity.badRequest().body(null);
+        if (!req.containsKey("debt_id") || !req.containsKey("amount")) {
+            return ResponseEntity.badRequest().body(
+                    Map.of("error", "Campos requeridos: debt_id y amount")
+            );
         }
 
-        DebtDTO debt = pagosService.lookupDebtByService(customerRef, serviceId, tenantId);
-        if (debt == null)
-            return ResponseEntity.notFound().build();
-        return ResponseEntity.ok(debt);
+        try {
+            Long debtId = Long.parseLong(req.get("debt_id").toString());
+            Double amount = Double.parseDouble(req.get("amount").toString());
+
+            Transaccion tx = pagosService.processPayment(debtId, amount);
+
+            return ResponseEntity.ok(Map.of(
+                    "message", "Pago aprobado",
+                    "transaction_id", tx.getId().toString(),
+                    "receipt_url", "/pagos/receipts/" + tx.getHashRecibo()
+            ));
+
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(
+                    Map.of("error", "Error procesando pago: " + e.getMessage())
+            );
+        }
     }
 
-    // Endpoint para obtener el recibo de pago en formato PDF
+    // =========================================================================
+    // 🔥 LOOKUP DE DEUDA
+    // POST /pagos/lookup
+    // =========================================================================
+    @PostMapping("/lookup")
+    public ResponseEntity<?> lookupDebt(@RequestBody LookupRequestDTO request) {
+
+        if (request.getCustomer_ref() == null || request.getCustomer_ref().isBlank()) {
+            return ResponseEntity.badRequest().body(
+                    Map.of("error", "customer_ref es obligatorio")
+            );
+        }
+
+        DebtDTO debt = pagosService.lookupDebtByService(
+                request.getCustomer_ref(),
+                request.getService_id(),
+                request.getTenant_id()
+        );
+
+        return (debt == null)
+                ? ResponseEntity.status(404).body(Map.of("error", "Deuda no encontrada"))
+                : ResponseEntity.ok(debt);
+    }
+
+    // =========================================================================
+    // 🔥 OBTENER RECIBO PDF
+    // GET /pagos/receipts/{filename}
+    // =========================================================================
     @GetMapping("/receipts/{filename:.+}")
     public ResponseEntity<?> getReceipt(@PathVariable String filename) {
         try {
-            var filePath = System.getProperty("java.io.tmpdir") + "/receipts/" + filename;
-            java.nio.file.Path path = java.nio.file.Paths.get(filePath);
-            if (java.nio.file.Files.exists(path)) {
-                return ResponseEntity.ok()
-                        .header("Content-Disposition", "inline; filename=\"" + filename + "\"")
-                        .contentType(org.springframework.http.MediaType.APPLICATION_PDF)
-                        .body(java.nio.file.Files.readAllBytes(path));
-            } else {
-                return ResponseEntity.notFound().build();
+            String root = System.getProperty("java.io.tmpdir") + "/receipts/";
+            Path path = Paths.get(root + filename);
+
+            if (!Files.exists(path)) {
+                return ResponseEntity.status(404).body(
+                        Map.of("error", "Recibo no encontrado")
+                );
             }
+
+            byte[] pdf = Files.readAllBytes(path);
+
+            return ResponseEntity.ok()
+                    .contentType(MediaType.APPLICATION_PDF)
+                    .header("Content-Disposition", "inline; filename=\"" + filename + "\"")
+                    .body(pdf);
+
         } catch (Exception e) {
-            return ResponseEntity.status(500).body("Error al obtener el recibo: " + e.getMessage());
+            return ResponseEntity.status(500).body(
+                    Map.of("error", "Error al obtener recibo: " + e.getMessage())
+            );
         }
     }
 }
